@@ -20,20 +20,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.aether.player.model.AudioFolder
 import com.aether.player.model.AudiophileSettings
 import com.aether.player.model.Track
 import kotlinx.coroutines.launch
 
-// Dark Audiophile Palette (Aether Dark theme)
-val BgDeepDark = Color(0xFF0A0C10)
-val SurfaceDark = Color(0xFF131722)
-val SurfaceHighlight = Color(0xFF1C2233)
+// Premium Dark Audiophile Palette (Aether Dark theme)
+val BgDeepDark = Color(0xFF08090D)
+val SurfaceDark = Color(0xFF11141E)
+val SurfaceHighlight = Color(0xFF1A1F2E)
 val CyanAccent = Color(0xFF00E5FF)
 val GoldAccent = Color(0xFFFFD700)
 val TextMuted = Color(0xFF8E9BAE)
@@ -57,6 +62,7 @@ fun MainScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
+    var showNowPlayingExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
@@ -153,6 +159,7 @@ fun MainScreen(
                         track = track,
                         isPlaying = isPlaying,
                         bitPerfect = settings.bitPerfectMode,
+                        onBarClick = { showNowPlayingExpanded = true },
                         onTogglePlay = { viewModel.togglePlayPause() }
                     )
                 }
@@ -233,6 +240,16 @@ fun MainScreen(
                     onDismiss = { showSettingsDialog = false }
                 )
             }
+
+            if (showNowPlayingExpanded && currentTrack != null) {
+                NowPlayingExpandedSheet(
+                    track = currentTrack!!,
+                    isPlaying = isPlaying,
+                    bitPerfect = settings.bitPerfectMode,
+                    onTogglePlay = { viewModel.togglePlayPause() },
+                    onDismiss = { showNowPlayingExpanded = false }
+                )
+            }
         }
     }
 }
@@ -257,7 +274,7 @@ fun SongsTabWithFastScroll(tracks: List<Track>, onTrackClick: (Track) -> Unit) {
                 }
             }
 
-            // Fast Scroll Thumb Indicator (Deslizador rápido lateral)
+            // Fast Scroll Thumb Indicator
             if (tracks.size > 10) {
                 val totalItems = tracks.size
                 val firstVisibleItem = listState.firstVisibleItemIndex
@@ -284,7 +301,6 @@ fun SongsTabWithFastScroll(tracks: List<Track>, onTrackClick: (Track) -> Unit) {
                             }
                         }
                 ) {
-                    // Track bar
                     Box(
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -292,7 +308,6 @@ fun SongsTabWithFastScroll(tracks: List<Track>, onTrackClick: (Track) -> Unit) {
                             .width(3.dp)
                             .background(SurfaceHighlight, RoundedCornerShape(2.dp))
                     )
-                    // Draggable handle
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopCenter)
@@ -414,14 +429,27 @@ fun TrackItem(track: Track, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Album art with fallback
         Box(
             modifier = Modifier
-                .size(46.dp)
+                .size(50.dp)
                 .clip(RoundedCornerShape(8.dp))
                 .background(SurfaceHighlight),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.Audiotrack, contentDescription = null, tint = CyanAccent)
+            if (track.albumArtUri != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(track.albumArtUri)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "Carátula",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(Icons.Default.Audiotrack, contentDescription = null, tint = CyanAccent)
+            }
         }
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -450,6 +478,21 @@ fun TrackItem(track: Track, onClick: () -> Unit) {
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold
                 )
+                if (track.lyrics != null) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        color = CyanAccent.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(3.dp)
+                    ) {
+                        Text(
+                            text = "LRC",
+                            color = CyanAccent,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.dp)
+                        )
+                    }
+                }
             }
         }
         Text(
@@ -466,11 +509,13 @@ fun NowPlayingBar(
     track: Track,
     isPlaying: Boolean,
     bitPerfect: Boolean,
+    onBarClick: () -> Unit,
     onTogglePlay: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onBarClick() }
             .padding(horizontal = 8.dp, vertical = 4.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceHighlight),
         shape = RoundedCornerShape(12.dp)
@@ -481,6 +526,28 @@ fun NowPlayingBar(
                 .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(SurfaceDark),
+                contentAlignment = Alignment.Center
+            ) {
+                if (track.albumArtUri != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(track.albumArtUri)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(Icons.Default.MusicNote, contentDescription = null, tint = CyanAccent)
+                }
+            }
+            Spacer(modifier = Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (bitPerfect) {
@@ -536,6 +603,188 @@ fun NowPlayingBar(
 }
 
 @Composable
+fun NowPlayingExpandedSheet(
+    track: Track,
+    isPlaying: Boolean,
+    bitPerfect: Boolean,
+    onTogglePlay: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var showLyricsView by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BgDeepDark)
+            .padding(20.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Bajar", tint = Color.White, modifier = Modifier.size(32.dp))
+                }
+                Text(
+                    text = "REPRODUCIENDO",
+                    color = GoldAccent,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp,
+                    fontSize = 12.sp
+                )
+                IconButton(onClick = { showLyricsView = !showLyricsView }) {
+                    Icon(
+                        Icons.Default.Lyrics,
+                        contentDescription = "Letras",
+                        tint = if (showLyricsView) CyanAccent else TextMuted
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (showLyricsView) {
+                // Lyrics View
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(SurfaceDark)
+                        .padding(20.dp)
+                ) {
+                    if (!track.lyrics.isNullOrBlank()) {
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            item {
+                                Text(
+                                    text = track.lyrics,
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    lineHeight = 28.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "Sin archivo .lrc de letras local.\nColoca un archivo con el mismo nombre y extensión .lrc junto a tu música.",
+                                color = TextMuted,
+                                textAlign = TextAlign.Center,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+            } else {
+                // Album Art Presentation
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(SurfaceDark),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (track.albumArtUri != null) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(track.albumArtUri)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = "Carátula de álbum",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Icon(Icons.Default.Audiotrack, contentDescription = null, tint = CyanAccent, modifier = Modifier.size(96.dp))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Track details
+            Text(
+                text = track.title,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${track.artist} — ${track.album}",
+                color = TextMuted,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Audiophile Tag Pill
+            Surface(
+                color = SurfaceHighlight,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (bitPerfect) {
+                        Text(
+                            text = "BIT-PERFECT",
+                            color = GoldAccent,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(
+                        text = track.audioFormatInfo,
+                        color = CyanAccent,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Playback controls
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onTogglePlay,
+                    modifier = Modifier.size(68.dp)
+                ) {
+                    Icon(
+                        if (isPlaying) Icons.Default.PauseCircle else Icons.Default.PlayCircle,
+                        contentDescription = null,
+                        tint = CyanAccent,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
 fun PermissionRequestBanner(onRequestPermission: () -> Unit) {
     Column(
         modifier = Modifier
@@ -557,7 +806,7 @@ fun PermissionRequestBanner(onRequestPermission: () -> Unit) {
             text = "Aether Player necesita permiso para leer los archivos de audio almacenados en tu dispositivo.",
             color = TextMuted,
             fontSize = 14.sp,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(24.dp))
         Button(
@@ -581,7 +830,7 @@ fun EmptyPlaceholder(message: String) {
             text = message,
             color = TextMuted,
             fontSize = 14.sp,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = TextAlign.Center
         )
     }
 }

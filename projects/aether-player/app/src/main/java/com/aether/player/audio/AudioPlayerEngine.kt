@@ -1,17 +1,25 @@
 package com.aether.player.audio
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.os.Build
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.audio.AudioSink
-import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaSessionService
+import androidx.media3.session.MediaStyleNotificationHelper
+import com.aether.player.MainActivity
 import com.aether.player.model.AudiophileSettings
 import com.aether.player.model.Track
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +29,11 @@ import kotlinx.coroutines.flow.asStateFlow
 @OptIn(UnstableApi::class)
 class AudioPlayerEngine(private val context: Context) {
 
-    private var exoPlayer: ExoPlayer? = null
+    var exoPlayer: ExoPlayer? = null
+        private set
+
+    var mediaSession: MediaSession? = null
+        private set
     
     private val _currentTrack = MutableStateFlow<Track?>(null)
     val currentTrack: StateFlow<Track?> = _currentTrack.asStateFlow()
@@ -40,6 +52,7 @@ class AudioPlayerEngine(private val context: Context) {
     }
 
     private fun buildPlayer() {
+        mediaSession?.release()
         exoPlayer?.release()
 
         // Bit-Perfect AudioAttributes: ContentType MUSIC + USAGE_MEDIA
@@ -49,21 +62,9 @@ class AudioPlayerEngine(private val context: Context) {
             .setAllowedCapturePolicy(C.ALLOW_CAPTURE_BY_NONE) // Audio purist: prevent background capture/mixing
             .build()
 
-        // Configure custom audio sink with direct 32-bit float output
-        val audioSink: AudioSink = DefaultAudioSink.Builder(context)
-            .setEnableFloatOutput(true) // 32-bit float output preserves maximum dynamic range without 16-bit truncation
-            .setEnableAudioTrackPlaybackParams(false) // Disable system pitch/speed stretching to prevent digital resampling
-            .build()
-
-        val renderersFactory = object : DefaultRenderersFactory(context) {
-            override fun buildAudioSink(
-                context: Context,
-                enableFloatOutput: Boolean,
-                enableAudioTrackPlaybackParams: Boolean
-            ): AudioSink {
-                return audioSink
-            }
-        }.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+        // Pure standard renderers factory that avoids FloatOutput timestamp discontinuity on FLAC
+        val renderersFactory = DefaultRenderersFactory(context)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
         exoPlayer = ExoPlayer.Builder(context, renderersFactory)
             .setAudioAttributes(audioAttributes, true)
@@ -83,11 +84,37 @@ class AudioPlayerEngine(private val context: Context) {
                     }
                 })
             }
+
+        // Initialize MediaSession for lock screen & notification controls
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        mediaSession = MediaSession.Builder(context, exoPlayer!!)
+            .setSessionActivity(pendingIntent)
+            .build()
     }
 
     fun playTrack(track: Track) {
         _currentTrack.value = track
-        val mediaItem = MediaItem.fromUri(track.uri)
+        val mediaMetadata = MediaMetadata.Builder()
+            .setTitle(track.title)
+            .setArtist(track.artist)
+            .setAlbumTitle(track.album)
+            .setArtworkUri(track.albumArtUri)
+            .build()
+
+        val mediaItem = MediaItem.Builder()
+            .setUri(track.uri)
+            .setMediaMetadata(mediaMetadata)
+            .build()
+
         exoPlayer?.apply {
             setMediaItem(mediaItem)
             prepare()
@@ -112,7 +139,9 @@ class AudioPlayerEngine(private val context: Context) {
     }
 
     fun release() {
+        mediaSession?.release()
         exoPlayer?.release()
+        mediaSession = null
         exoPlayer = null
     }
 }

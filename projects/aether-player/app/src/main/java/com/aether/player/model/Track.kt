@@ -7,6 +7,7 @@ data class Track(
     val title: String,
     val artist: String,
     val album: String,
+    val albumId: Long = 0L,
     val durationMs: Long,
     val uri: Uri,
     val dataPath: String,
@@ -16,7 +17,9 @@ data class Track(
     val mimeType: String,
     val sampleRate: Int = 0,
     val bitDepth: Int = 0,
-    val bitRate: Long = 0L
+    val bitRate: Long = 0L,
+    val albumArtUri: Uri? = null,
+    val lyrics: String? = null
 ) {
     val durationFormatted: String
         get() {

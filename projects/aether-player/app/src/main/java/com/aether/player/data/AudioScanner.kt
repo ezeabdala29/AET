@@ -13,6 +13,8 @@ import java.io.File
 
 class AudioScanner(private val context: Context) {
 
+    private val albumArtBaseUri = Uri.parse("content://media/external/audio/albumart")
+
     suspend fun scanTracks(): List<Track> = withContext(Dispatchers.IO) {
         val tracks = mutableListOf<Track>()
 
@@ -27,6 +29,7 @@ class AudioScanner(private val context: Context) {
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
             MediaStore.Audio.Media.ALBUM,
+            MediaStore.Audio.Media.ALBUM_ID,
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.DATA,
             MediaStore.Audio.Media.SIZE,
@@ -49,6 +52,7 @@ class AudioScanner(private val context: Context) {
                 val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
                 val artistCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
                 val albumCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
+                val albumIdCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
                 val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
                 val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
                 val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
@@ -59,6 +63,7 @@ class AudioScanner(private val context: Context) {
                     val title = cursor.getString(titleCol) ?: "Unknown Title"
                     val artist = cursor.getString(artistCol).takeIf { it != "<unknown>" } ?: "Unknown Artist"
                     val album = cursor.getString(albumCol).takeIf { it != "<unknown>" } ?: "Unknown Album"
+                    val albumId = cursor.getLong(albumIdCol)
                     val duration = cursor.getLong(durationCol)
                     val dataPath = cursor.getString(dataCol) ?: ""
                     val size = cursor.getLong(sizeCol)
@@ -69,8 +74,9 @@ class AudioScanner(private val context: Context) {
                     val folderName = file.parentFile?.name ?: "Root"
 
                     val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+                    val artUri = ContentUris.withAppendedId(albumArtBaseUri, albumId)
 
-                    // Estimate technical format from file extension and size/duration without blocking disk I/O
+                    // Estimate technical format from file extension and size/duration
                     val ext = file.extension.lowercase()
                     var sampleRate = 44100
                     var bitDepth = 16
@@ -90,12 +96,19 @@ class AudioScanner(private val context: Context) {
                         bitDepth = 16
                     }
 
+                    // Check for local .lrc lyrics file alongside audio file
+                    val lrcFile = File(file.parentFile, "${file.nameWithoutExtension}.lrc")
+                    val lyrics = if (lrcFile.exists() && lrcFile.canRead()) {
+                        try { lrcFile.readText() } catch (_: Exception) { null }
+                    } else null
+
                     tracks.add(
                         Track(
                             id = id,
                             title = title,
                             artist = artist,
                             album = album,
+                            albumId = albumId,
                             durationMs = duration,
                             uri = contentUri,
                             dataPath = dataPath,
@@ -105,7 +118,9 @@ class AudioScanner(private val context: Context) {
                             mimeType = mime,
                             sampleRate = sampleRate,
                             bitDepth = bitDepth,
-                            bitRate = bitRate
+                            bitRate = bitRate,
+                            albumArtUri = artUri,
+                            lyrics = lyrics
                         )
                     )
                 }
