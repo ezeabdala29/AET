@@ -45,9 +45,9 @@ manifest with API 24 minSdk) and a `CONTEXT.md`, no playback implementation yet.
 | T4 | Commands, config, MCP manifest | S3 | inline | done |
 | T5 | `AGENTS.md` contract and README | S4 | inline | done |
 | T6 | Skill sync tool | S6 | inline | done |
-| T7 | Install Vercel skills + lockfile | S5 | inline | pending |
-| T8 | Android scaffold + `CONTEXT.md` | S8 | inline | pending |
-| T9 | git init, commit, push | S7 | inline | pending |
+| T7 | Install Vercel skills + lockfile | S5 | inline | done (9 skills; no lockfile emitted by CLI 1.9.0) |
+| T8 | Android scaffold + `CONTEXT.md` | S8 | inline | done (unbuilt — no JDK/SDK) |
+| T9 | git init, commit, push | S7 | inline | done |
 
 ## Log
 
@@ -79,3 +79,18 @@ is available for the push.
 
 **L5** — Skills: vercel-labs skills already present globally under `C:\Users\PC\.agents\skills`
 from a previous install. Installing at project scope anyway, per the request.
+
+**L6** — `npx skills add vercel-labs/agent-skills` (CLI 1.9.0) needed three runs: the first two
+were cut off mid-copy by host restarts. Run detached with stdin redirected from `NUL` it
+completed with exit 0 and installed 9 skills into `.agents/skills`. It does not emit
+`skills-lock.json` on this path, so S5's lockfile clause is recorded as unmet rather than
+faked. `tools/sync-skills.ps1` then mirrored all 19 skills (10 AETHER + 9 Vercel) into
+`.opencode/skills` and `.codex/skills`.
+
+**L7** — Toolchain gap: no JDK, no Gradle, no Android SDK on this machine (`java`, `gradle`
+absent; `ANDROID_HOME` unset). The Android scaffold is therefore **unbuilt and unverified**.
+`projects/aether-player/docs/setup-android.md` records the exact install path. No claim of a
+working build is made anywhere in this repo.
+
+**L8** — `pwsh` is not installed; Windows PowerShell 5.1 is. All documented commands use
+`powershell -File`, and `tools/sync-skills.ps1` is 5.1-compatible.
