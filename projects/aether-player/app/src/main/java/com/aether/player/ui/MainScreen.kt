@@ -3,11 +3,15 @@ package com.aether.player.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -23,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.aether.player.model.AudioFolder
 import com.aether.player.model.AudiophileSettings
 import com.aether.player.model.Track
+import kotlinx.coroutines.launch
 
 // Dark Audiophile Palette (Aether Dark theme)
 val BgDeepDark = Color(0xFF0A0C10)
@@ -46,13 +52,29 @@ fun MainScreen(
     val currentTrack by viewModel.playerEngine.currentTrack.collectAsState()
     val isPlaying by viewModel.playerEngine.isPlaying.collectAsState()
     val settings by viewModel.playerEngine.settings.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var isSearchActive by remember { mutableStateOf(false) }
 
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
             viewModel.loadLibrary()
+        }
+    }
+
+    val filteredTracks = remember(allTracks, searchQuery) {
+        if (searchQuery.isBlank()) {
+            allTracks
+        } else {
+            val q = searchQuery.trim().lowercase()
+            allTracks.filter {
+                it.title.lowercase().contains(q) ||
+                it.artist.lowercase().contains(q) ||
+                it.album.lowercase().contains(q) ||
+                it.folderName.lowercase().contains(q)
+            }
         }
     }
 
@@ -65,24 +87,55 @@ fun MainScreen(
                     titleContentColor = Color.White
                 ),
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "AETHER",
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 2.sp,
-                            color = CyanAccent,
-                            fontSize = 20.sp
+                    if (isSearchActive) {
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.setSearchQuery(it) },
+                            placeholder = { Text("Buscar canción, artista o álbum...", color = TextMuted, fontSize = 14.sp) },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                cursorColor = CyanAccent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "HI-FI PLAYER",
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 13.sp,
-                            color = GoldAccent
-                        )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "AETHER",
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 2.sp,
+                                color = CyanAccent,
+                                fontSize = 20.sp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "HI-FI PLAYER",
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 13.sp,
+                                color = GoldAccent
+                            )
+                        }
                     }
                 },
                 actions = {
+                    if (isSearchActive) {
+                        IconButton(onClick = {
+                            isSearchActive = false
+                            viewModel.setSearchQuery("")
+                        }) {
+                            Icon(Icons.Default.Close, contentDescription = "Cerrar búsqueda", tint = TextMuted)
+                        }
+                    } else {
+                        IconButton(onClick = { isSearchActive = true }) {
+                            Icon(Icons.Default.Search, contentDescription = "Buscar", tint = CyanAccent)
+                        }
+                    }
                     IconButton(onClick = { viewModel.loadLibrary() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Recargar", tint = TextMuted)
                     }
@@ -115,7 +168,7 @@ fun MainScreen(
                             viewModel.selectFolder(null)
                         },
                         icon = { Icon(Icons.Default.MusicNote, contentDescription = "Canciones") },
-                        label = { Text("Canciones (${allTracks.size})") },
+                        label = { Text("Canciones (${filteredTracks.size})") },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = CyanAccent,
                             selectedTextColor = CyanAccent,
@@ -150,7 +203,7 @@ fun MainScreen(
                 }
             } else {
                 when (selectedTab) {
-                    0 -> SongsTab(tracks = allTracks, onTrackClick = { viewModel.playTrack(it) })
+                    0 -> SongsTabWithFastScroll(tracks = filteredTracks, onTrackClick = { viewModel.playTrack(it) })
                     1 -> {
                         if (selectedFolder != null) {
                             val folderTracks = allTracks.filter { it.folderPath == selectedFolder?.path }
@@ -185,16 +238,81 @@ fun MainScreen(
 }
 
 @Composable
-fun SongsTab(tracks: List<Track>, onTrackClick: (Track) -> Unit) {
+fun SongsTabWithFastScroll(tracks: List<Track>, onTrackClick: (Track) -> Unit) {
     if (tracks.isEmpty()) {
-        EmptyPlaceholder(message = "No se encontraron canciones en el almacenamiento.\nAsegúrate de copiar archivos de música a tu teléfono.")
+        EmptyPlaceholder(message = "No se encontraron canciones.\nAsegúrate de copiar archivos de música a tu teléfono o cambia el filtro de búsqueda.")
     } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 16.dp)
-        ) {
-            items(tracks, key = { it.id }) { track ->
-                TrackItem(track = track, onClick = { onTrackClick(track) })
+        val listState = rememberLazyListState()
+        val coroutineScope = rememberCoroutineScope()
+        var isDraggingScrollbar by remember { mutableStateOf(false) }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(end = 24.dp, bottom = 16.dp)
+            ) {
+                items(tracks, key = { it.id }) { track ->
+                    TrackItem(track = track, onClick = { onTrackClick(track) })
+                }
+            }
+
+            // Fast Scroll Thumb Indicator (Deslizador rápido lateral)
+            if (tracks.size > 10) {
+                val totalItems = tracks.size
+                val firstVisibleItem = listState.firstVisibleItemIndex
+                val thumbRatio = firstVisibleItem.toFloat() / totalItems.coerceAtLeast(1)
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .width(28.dp)
+                        .padding(vertical = 12.dp)
+                        .pointerInput(totalItems) {
+                            detectVerticalDragGestures(
+                                onDragStart = { isDraggingScrollbar = true },
+                                onDragEnd = { isDraggingScrollbar = false },
+                                onDragCancel = { isDraggingScrollbar = false }
+                            ) { change, _ ->
+                                val positionY = change.position.y.coerceIn(0f, size.height.toFloat())
+                                val fraction = positionY / size.height.toFloat()
+                                val targetIndex = (fraction * (totalItems - 1)).toInt().coerceIn(0, totalItems - 1)
+                                coroutineScope.launch {
+                                    listState.scrollToItem(targetIndex)
+                                }
+                            }
+                        }
+                ) {
+                    // Track bar
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .fillMaxHeight()
+                            .width(3.dp)
+                            .background(SurfaceHighlight, RoundedCornerShape(2.dp))
+                    )
+                    // Draggable handle
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .offset(y = (thumbRatio * 450).dp)
+                            .size(if (isDraggingScrollbar) 22.dp else 16.dp)
+                            .clip(CircleShape)
+                            .background(if (isDraggingScrollbar) GoldAccent else CyanAccent),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (isDraggingScrollbar) {
+                            val currentLetter = tracks.getOrNull(firstVisibleItem)?.title?.take(1)?.uppercase() ?: ""
+                            Text(
+                                text = currentLetter,
+                                color = BgDeepDark,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -271,7 +389,7 @@ fun FolderDetailView(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Atrás", tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás", tint = Color.White)
             }
             Column {
                 Text(text = folder.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)

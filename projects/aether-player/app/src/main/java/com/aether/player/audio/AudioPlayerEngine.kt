@@ -10,7 +10,6 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.audio.AudioCapabilities
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import com.aether.player.model.AudiophileSettings
@@ -43,16 +42,15 @@ class AudioPlayerEngine(private val context: Context) {
     private fun buildPlayer() {
         exoPlayer?.release()
 
-        // Bit-Perfect AudioAttributes: FLAG_AUDIBILITY_ENFORCED or CONTENT_TYPE_MUSIC + USAGE_MEDIA
+        // Bit-Perfect AudioAttributes: ContentType MUSIC + USAGE_MEDIA
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .setUsage(C.USAGE_MEDIA)
             .setAllowedCapturePolicy(C.ALLOW_CAPTURE_BY_NONE) // Audio purist: prevent background capture/mixing
             .build()
 
-        // Configure custom audio sink with direct output capabilities (bypass resampler where supported)
+        // Configure custom audio sink with direct 32-bit float output
         val audioSink: AudioSink = DefaultAudioSink.Builder(context)
-            .setAudioCapabilities(AudioCapabilities.getCapabilities(context))
             .setEnableFloatOutput(true) // 32-bit float output preserves maximum dynamic range without 16-bit truncation
             .setEnableAudioTrackPlaybackParams(false) // Disable system pitch/speed stretching to prevent digital resampling
             .build()
@@ -109,7 +107,6 @@ class AudioPlayerEngine(private val context: Context) {
 
     fun updateSettings(newSettings: AudiophileSettings) {
         _settings.value = newSettings
-        // Rebuild or adapt engine if bit-perfect / bypass toggled
         buildPlayer()
         _currentTrack.value?.let { playTrack(it) }
     }

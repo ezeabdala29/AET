@@ -2,7 +2,6 @@ package com.aether.player.data
 
 import android.content.ContentUris
 import android.content.Context
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -71,29 +70,24 @@ class AudioScanner(private val context: Context) {
 
                     val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
 
-                    // Optional audio extraction for sample rate & bitrate
-                    var sampleRate = 0
+                    // Estimate technical format from file extension and size/duration without blocking disk I/O
+                    val ext = file.extension.lowercase()
+                    var sampleRate = 44100
+                    var bitDepth = 16
                     var bitRate = 0L
-                    var bitDepth = 16 // Standard default, FLAC/WAV may be 24
 
-                    if (file.exists() && file.canRead()) {
-                        try {
-                            MediaMetadataRetriever().use { mmr ->
-                                mmr.setDataSource(file.absolutePath)
-                                val srStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_SAMPLERATE)
-                                val brStr = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_BITRATE)
-                                sampleRate = srStr?.toIntOrNull() ?: 0
-                                bitRate = brStr?.toLongOrNull() ?: 0L
-                                
-                                val ext = file.extension.lowercase()
-                                if (ext == "flac" || ext == "wav" || ext == "alac") {
-                                    // Check if high res
-                                    if (bitRate > 1411200L || sampleRate > 48000) {
-                                        bitDepth = 24
-                                    }
-                                }
-                            }
-                        } catch (_: Exception) {}
+                    if (duration > 0) {
+                        bitRate = (size * 8 * 1000) / duration
+                    }
+
+                    if (ext == "flac" || ext == "wav" || ext == "alac") {
+                        if (bitRate > 1500000L) {
+                            bitDepth = 24
+                            sampleRate = if (bitRate > 3000000L) 96000 else 48000
+                        }
+                    } else if (ext == "mp3") {
+                        sampleRate = 44100
+                        bitDepth = 16
                     }
 
                     tracks.add(
