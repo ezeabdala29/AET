@@ -1,11 +1,11 @@
 # aether-player — context
 
-Updated: 2026-11-21 · Phase: scaffold
+Updated: 2026-11-21 · Phase: local playback UI
 
 ## What it is
-An Android music player for local files. Plays hi-fi formats, fills in cover art and lyrics
-from the network when the file does not carry them, and installs as an APK on Android 7.0+.
-It is not a streaming service and not a cloud library.
+An Android music player for local files. Plays hi-fi formats, displays available cover art and
+local `.lrc` lyrics, and installs as an APK on Android 7.0+. It is not a streaming service or
+cloud library.
 
 ## Hard constraints
 - `minSdk 24` (Android 7.0). Any API above 24 needs a runtime guard and a fallback.
@@ -13,7 +13,7 @@ It is not a streaming service and not a cloud library.
   `maxSdkVersion=32` below it.
 - Cover art and lyrics URLs are untrusted input from the network.
 - Playback must survive screen off and backgrounding.
-- No Gradle wrapper committed yet.
+- Gradle 8.9 wrapper is present; the app builds with the configured Android SDK.
 
 ## Stack
 | Layer | Choice | Why |
@@ -21,14 +21,18 @@ It is not a streaming service and not a cloud library.
 | Language | Kotlin | Compose and coroutines are Kotlin-first |
 | UI | Jetpack Compose | less XML, state-driven player UI |
 | Playback | Media3 / ExoPlayer | FLAC/ALAC support, media session, notification |
-| Persistence | Room | library index and offline caches |
+| Persistence | Android platform APIs | MediaStore scanning and SharedPreferences for favorites; Room is not integrated yet |
 | Images | Coil | remote cover art with disk cache |
-| DI | Koin | no annotation processing, faster incremental builds |
+| DI | Manual wiring | Koin is not integrated yet |
 
 ## Current state
-- Done: Gradle scaffold, manifest with permission split, Compose placeholder screen
-- In progress: nothing
-- Known broken: no playback, no library scan, no network layer
+- Done: local audio scanning, Media3 playback and media session, Compose library/folder views,
+  mini-player, lyrics display, audio settings, light/dark themes, queue controls and favorites.
+- Mix: the Mix tab starts a continuous ExoPlayer playlist and supports shuffle. It does not yet
+  provide crossfade, beat matching, BPM detection, or key analysis; the UI labels these limits.
+- In progress: improve the listening experience and expand playlist/mix capabilities.
+- Known limitations: favorites are stored locally; playlists are not persisted; recent listening
+  history, online metadata enrichment, and track deletion are not implemented.
 
 ## Decisions
 - 2026-11-21 — Media3 over a custom audio pipeline — we lose fine control of the output path,
