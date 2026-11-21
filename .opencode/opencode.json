@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "theme": "aether",
+  "autoupdate": true,
+  "instructions": ["AGENTS.md"],
+  "agent": {
+    "orchestrator": { "model": "anthropic/claude-sonnet-4-5" },
+    "explorer": { "model": "anthropic/claude-haiku-4-5" },
+    "architect": { "model": "anthropic/claude-sonnet-4-5" },
+    "developer": { "model": "anthropic/claude-sonnet-4-5" },
+    "qa-engineer": { "model": "anthropic/claude-haiku-4-5" },
+    "security-auditor": { "model": "anthropic/claude-sonnet-4-5" },
+    "integrator": { "model": "anthropic/claude-haiku-4-5" }
+  }
+}
