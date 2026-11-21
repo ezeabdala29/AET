@@ -76,25 +76,10 @@ class AudioScanner(private val context: Context) {
                     val contentUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
                     val artUri = ContentUris.withAppendedId(albumArtBaseUri, albumId)
 
-                    // Estimate technical format from file extension and size/duration
-                    val ext = file.extension.lowercase()
-                    var sampleRate = 44100
-                    var bitDepth = 16
-                    var bitRate = 0L
-
-                    if (duration > 0) {
-                        bitRate = (size * 8 * 1000) / duration
-                    }
-
-                    if (ext == "flac" || ext == "wav" || ext == "alac") {
-                        if (bitRate > 1500000L) {
-                            bitDepth = 24
-                            sampleRate = if (bitRate > 3000000L) 96000 else 48000
-                        }
-                    } else if (ext == "mp3") {
-                        sampleRate = 44100
-                        bitDepth = 16
-                    }
+                    // MediaStore does not guarantee codec rate/bit-depth metadata; never infer it from size or extension.
+                    val sampleRate = 0
+                    val bitDepth = 0
+                    val bitRate = 0L
 
                     // Check for local .lrc lyrics file alongside audio file
                     val lrcFile = File(file.parentFile, "${file.nameWithoutExtension}.lrc")

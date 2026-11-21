@@ -30,15 +30,19 @@ data class Track(
         }
 
     val audioFormatInfo: String
-        get() {
-            val extension = dataPath.substringAfterLast('.', "").uppercase()
-            return when {
-                sampleRate > 0 && bitDepth > 0 -> "$extension · $bitDepth-bit / ${sampleRate / 1000.0} kHz"
-                sampleRate > 0 -> "$extension · ${sampleRate / 1000.0} kHz"
-                extension.isNotEmpty() -> extension
-                else -> "AUDIO"
-            }
+        get() = AudioFormatInfo.describe(dataPath, sampleRate, bitDepth)
+}
+
+object AudioFormatInfo {
+    fun describe(dataPath: String, sampleRate: Int, bitDepth: Int): String {
+        val extension = dataPath.substringAfterLast('.', "").uppercase()
+        return when {
+            sampleRate > 0 && bitDepth > 0 -> "$extension · $bitDepth-bit / ${sampleRate / 1000.0} kHz"
+            sampleRate > 0 -> "$extension · ${sampleRate / 1000.0} kHz"
+            extension.isNotEmpty() -> "$extension · formato de salida no confirmado"
+            else -> "AUDIO"
         }
+    }
 }
 
 data class AudioFolder(
