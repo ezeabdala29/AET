@@ -1,0 +1,44 @@
+{
+  "workspace": "aether",
+  "version": 1,
+  "activeProject": "aether-player",
+  "projects": {
+    "aether-player": {
+      "path": "projects/aether-player",
+      "type": "android",
+      "language": "kotlin",
+      "minSdk": 24,
+      "targetSdk": 35,
+      "compileSdk": 35,
+      "build": "gradle-kotlin-dsl",
+      "testCommands": {
+        "unit": "./gradlew :app:testDebugUnitTest",
+        "instrumented": "./gradlew :app:connectedDebugAndroidTest",
+        "assemble": "./gradlew :app:assembleDebug"
+      }
+    }
+  },
+  "agents": {
+    "orchestrator": { "tier": "reasoning", "canWrite": false },
+    "explorer": { "tier": "cheap", "canWrite": false },
+    "architect": { "tier": "reasoning", "canWrite": ["docs/"] },
+    "developer": { "tier": "coder", "canWrite": ["source", "tests", "docs/"] },
+    "qa-engineer": { "tier": "cheap", "canWrite": ["tests"] },
+    "security-auditor": { "tier": "reasoning", "canWrite": false },
+    "integrator": { "tier": "cheap", "canWrite": false }
+  },
+  "gates": {
+    "requirePlanBeforeCode": true,
+    "requireTestOutput": true,
+    "requireSecurityAuditBeforeRelease": true,
+    "maxChangedLinesPerCycle": 400
+  },
+  "paths": {
+    "skills": "skills",
+    "agents": ".opencode/agent",
+    "commands": ".opencode/command",
+    "reports": "reports",
+    "memory": "memory",
+    "logs": "logs"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$comment": "MCP servers expected by this workspace. Merge into your OpenCode config as needed.",
+  "mcp": {
+    "codegraph": {
+      "type": "local",
+      "enabled": true,
+      "command": ["codegraph", "serve"],
+      "purpose": "structural code search before filesystem scanning"
+    },
+    "context7": {
+      "type": "remote",
+      "enabled": true,
+      "url": "https://mcp.context7.com/mcp",
+      "purpose": "current library documentation (Media3, Compose, Room, Coil)"
+    },
+    "engram": {
+      "type": "local",
+      "enabled": true,
+      "command": ["engram", "mcp"],
+      "purpose": "persistent decisions and session memory"
+    }
+  }
+}

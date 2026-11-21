@@ -1,0 +1,43 @@
+# --- AETHER workspace ---
+logs/*
+!logs/.gitkeep
+memory/*
+!memory/.gitkeep
+reports/*
+!reports/.gitkeep
+
+# --- Android / Gradle ---
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.jks
+*.keystore
+release/
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
+
+# --- Agent runtime noise ---
+.atl/
+install-skills.log
+sync-skills.log
+skills-lock.json
